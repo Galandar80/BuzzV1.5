@@ -41,24 +41,26 @@ const GameModeDisplay: React.FC = () => {
     const rules = [];
     
     if (mode.settings.timeLimit) {
-      rules.push(`⏱️ ${mode.settings.timeLimit} secondi per rispondere`);
-    }
-    
-    if (mode.settings.pointsCorrect) {
-      rules.push(`✅ +${mode.settings.pointsCorrect} punti per risposta corretta`);
-    }
-    
-    if (mode.settings.pointsWrong) {
-      rules.push(`❌ -${mode.settings.pointsWrong} punti per risposta sbagliata`);
-    }
-    
-    if (mode.settings.teamsEnabled) {
-      rules.push(`👥 Modalità squadre attiva`);
+      rules.push(`⏱️ Tempo limite: ${mode.settings.timeLimit} secondi`);
     }
     
     if (mode.settings.autoNext) {
-      rules.push(`🔄 Playlist automatica`);
+      rules.push('🔄 Prossima canzone automatica');
     }
+    
+    if (mode.settings.teamsEnabled) {
+      rules.push('👥 Modalità squadre attiva');
+    }
+    
+    if (mode.settings.pointsCorrect) {
+      rules.push(`✅ Risposta corretta: +${mode.settings.pointsCorrect} punti`);
+    }
+    
+    if (mode.settings.pointsWrong) {
+      rules.push(`❌ Risposta sbagliata: -${mode.settings.pointsWrong} punti`);
+    }
+    
+    rules.push('⭐ Risposta SUPER: +20 punti');
     
     return rules;
   };

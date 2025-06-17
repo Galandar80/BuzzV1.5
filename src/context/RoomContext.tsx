@@ -94,6 +94,9 @@ interface RoomContextType {
   handleLeaveRoom: () => Promise<void>;
   awardPoints: (amount?: number) => Promise<void>;
   subtractPlayerPoints: (amount?: number) => Promise<void>;
+  awardCorrectAnswer: () => Promise<void>;
+  awardWrongAnswer: () => Promise<void>;
+  awardSuperAnswer: () => Promise<void>;
   rejectAnswer: () => Promise<void>;
   submitAnswer: (answer: string) => Promise<void>;
   audioStreamManager: AudioStreamManager | null;
@@ -361,6 +364,107 @@ export function RoomProvider({ children }: { children: ReactNode }) {
     } catch (err) {
       console.error('Errore nel resettare il buzz:', err);
       toast.error('Errore nel resettare il buzz');
+    }
+  };
+
+  // Funzioni specifiche per assegnazione punti dal pannello di valutazione
+  const awardCorrectAnswer = async () => {
+    if (!roomCode || !isHost || !roomData?.winnerInfo) return;
+    
+    try {
+      const winnerInfo = roomData.winnerInfo;
+      const playerId = winnerInfo.playerId;
+      const playerRef = ref(database, `rooms/${roomCode}/players/${playerId}`);
+      const currentPlayer = roomData.players[playerId];
+      
+      if (!currentPlayer) return;
+      
+      // Punti base per risposta corretta
+      const basePoints = currentGameMode?.settings?.pointsCorrect || 10;
+      const currentScore = currentPlayer.points || 0;
+      const currentStreak = (currentPlayer.currentStreak || 0) + 1;
+      const bestStreak = Math.max(currentStreak, currentPlayer.bestStreak || 0);
+      
+      await update(playerRef, {
+        points: currentScore + basePoints,
+        currentStreak,
+        bestStreak,
+        correctAnswers: (currentPlayer.correctAnswers || 0) + 1,
+        lastAnswerTime: Date.now()
+      });
+      
+      await rejectPlayerAnswer(roomCode);
+      toast.success(`${currentPlayer.name}: +${basePoints} punti! (Risposta corretta)`);
+      
+    } catch (err) {
+      console.error('Errore nell\'assegnare punti corretti:', err);
+      toast.error('Errore nell\'assegnare punti');
+    }
+  };
+
+  const awardWrongAnswer = async () => {
+    if (!roomCode || !isHost || !roomData?.winnerInfo) return;
+    
+    try {
+      const winnerInfo = roomData.winnerInfo;
+      const playerId = winnerInfo.playerId;
+      const playerRef = ref(database, `rooms/${roomCode}/players/${playerId}`);
+      const currentPlayer = roomData.players[playerId];
+      
+      if (!currentPlayer) return;
+      
+      // Punti negativi per risposta sbagliata
+      const penaltyPoints = currentGameMode?.settings?.pointsWrong || 5;
+      const currentScore = currentPlayer.points || 0;
+      const newScore = Math.max(0, currentScore - penaltyPoints);
+      
+      await update(playerRef, {
+        points: newScore,
+        currentStreak: 0, // Reset streak
+        wrongAnswers: (currentPlayer.wrongAnswers || 0) + 1,
+        lastAnswerTime: Date.now()
+      });
+      
+      await rejectPlayerAnswer(roomCode);
+      toast.success(`${currentPlayer.name}: -${penaltyPoints} punti (Risposta sbagliata)`);
+      
+    } catch (err) {
+      console.error('Errore nel sottrarre punti:', err);
+      toast.error('Errore nel sottrarre punti');
+    }
+  };
+
+  const awardSuperAnswer = async () => {
+    if (!roomCode || !isHost || !roomData?.winnerInfo) return;
+    
+    try {
+      const winnerInfo = roomData.winnerInfo;
+      const playerId = winnerInfo.playerId;
+      const playerRef = ref(database, `rooms/${roomCode}/players/${playerId}`);
+      const currentPlayer = roomData.players[playerId];
+      
+      if (!currentPlayer) return;
+      
+      // Punti bonus per risposta eccellente
+      const superPoints = 20;
+      const currentScore = currentPlayer.points || 0;
+      const currentStreak = (currentPlayer.currentStreak || 0) + 1;
+      const bestStreak = Math.max(currentStreak, currentPlayer.bestStreak || 0);
+      
+      await update(playerRef, {
+        points: currentScore + superPoints,
+        currentStreak,
+        bestStreak,
+        correctAnswers: (currentPlayer.correctAnswers || 0) + 1,
+        lastAnswerTime: Date.now()
+      });
+      
+      await rejectPlayerAnswer(roomCode);
+      toast.success(`${currentPlayer.name}: +${superPoints} punti! (Risposta SUPER!)`);
+      
+    } catch (err) {
+      console.error('Errore nell\'assegnare super punti:', err);
+      toast.error('Errore nell\'assegnare punti');
     }
   };
 
@@ -664,6 +768,9 @@ export function RoomProvider({ children }: { children: ReactNode }) {
     handleLeaveRoom,
     awardPoints,
     subtractPlayerPoints,
+    awardCorrectAnswer,
+    awardWrongAnswer,
+    awardSuperAnswer,
     rejectAnswer,
     submitAnswer,
     audioStreamManager,

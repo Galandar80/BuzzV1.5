@@ -11,11 +11,22 @@ import {
   User,
   Timer,
   Send,
-  X
+  X,
+  Star,
+  Zap
 } from 'lucide-react';
 
 export function PlayerAnswer() {
-  const { roomData, isHost, awardPoints, subtractPlayerPoints, rejectAnswer, gameTimer } = useRoom();
+  const { 
+    roomData, 
+    isHost, 
+    awardCorrectAnswer, 
+    awardWrongAnswer, 
+    awardSuperAnswer, 
+    rejectAnswer, 
+    gameTimer,
+    currentGameMode 
+  } = useRoom();
   const [showAnswer, setShowAnswer] = useState(false);
   const modalRef = useRef<HTMLDivElement>(null);
 
@@ -79,17 +90,22 @@ export function PlayerAnswer() {
     return `${seconds.toFixed(1)}s`;
   };
 
-  const handleAccept = async () => {
-    await awardPoints();
+  const handleCorrect = async () => {
+    await awardCorrectAnswer();
     setShowAnswer(false);
   };
 
-  const handleReject = async () => {
-    await subtractPlayerPoints();
+  const handleWrong = async () => {
+    await awardWrongAnswer();
     setShowAnswer(false);
   };
 
-  const handleDismiss = async () => {
+  const handleSuper = async () => {
+    await awardSuperAnswer();
+    setShowAnswer(false);
+  };
+
+  const handleIgnore = async () => {
     await rejectAnswer();
     setShowAnswer(false);
   };
@@ -99,6 +115,11 @@ export function PlayerAnswer() {
       setShowAnswer(false);
     }
   };
+
+  // Punti per ogni azione basati sulla modalità di gioco
+  const correctPoints = currentGameMode?.settings?.pointsCorrect || 10;
+  const wrongPoints = currentGameMode?.settings?.pointsWrong || 5;
+  const superPoints = 20;
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-300">
@@ -132,12 +153,19 @@ export function PlayerAnswer() {
                 Ha inviato una risposta
               </p>
             </div>
-            {responseTime > 0 && (
-              <Badge variant="secondary" className="flex items-center gap-1">
-                <Timer className="h-3 w-3" />
-                {formatTime(responseTime)}
-              </Badge>
-            )}
+            <div className="flex items-center gap-2">
+              {responseTime > 0 && (
+                <Badge variant="secondary" className="flex items-center gap-1">
+                  <Timer className="h-3 w-3" />
+                  {formatTime(responseTime)}
+                </Badge>
+              )}
+              {currentGameMode && (
+                <Badge variant="outline" className="text-xs">
+                  {currentGameMode.name}
+                </Badge>
+              )}
+            </div>
           </div>
 
           {/* Risposta in evidenza */}
@@ -163,26 +191,40 @@ export function PlayerAnswer() {
               <p className="text-center text-sm text-muted-foreground mb-4">
                 Valuta la risposta di {winnerInfo.playerName}
               </p>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              
+              {/* Prima riga: Corretta e Super */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
                 <Button
-                  onClick={handleAccept}
+                  onClick={handleCorrect}
                   className="bg-green-600 hover:bg-green-700 text-white flex items-center gap-2 transition-all hover:scale-105"
                   size="lg"
                 >
                   <CheckCircle className="h-5 w-5" />
-                  Corretta
+                  Corretta (+{correctPoints})
                 </Button>
                 <Button
-                  onClick={handleReject}
+                  onClick={handleSuper}
+                  className="bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-white flex items-center gap-2 transition-all hover:scale-105"
+                  size="lg"
+                >
+                  <Star className="h-5 w-5" />
+                  SUPER! (+{superPoints})
+                </Button>
+              </div>
+              
+              {/* Seconda riga: Sbagliata e Ignora */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <Button
+                  onClick={handleWrong}
                   variant="destructive"
                   className="flex items-center gap-2 transition-all hover:scale-105"
                   size="lg"
                 >
                   <XCircle className="h-5 w-5" />
-                  Sbagliata
+                  Sbagliata (-{wrongPoints})
                 </Button>
                 <Button
-                  onClick={handleDismiss}
+                  onClick={handleIgnore}
                   variant="outline"
                   className="flex items-center gap-2 transition-all hover:scale-105"
                   size="lg"
