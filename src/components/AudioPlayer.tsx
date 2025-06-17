@@ -117,38 +117,71 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ onAudioPause }) => {
   // Gestione stato riproduzione audio remoto per utenti non host
   useEffect(() => {
     if (!isHost) {
+      // Controlla sia l'elemento audio remoto che gli stream WebRTC
       const remoteAudio = document.getElementById('remote-audio') as HTMLAudioElement | null;
+      
       if (remoteAudio) {
         const handleRemotePlay = () => {
           setIsRemotePlaying(true);
           setIsAudioPlaying(true);
-          console.log('Audio remoto iniziato - Buzz abilitato');
+          console.log('Audio remoto iniziato - Buzz abilitato per partecipante');
         };
         
         const handleRemotePause = () => {
           setIsRemotePlaying(false);
           setIsAudioPlaying(false);
-          console.log('Audio remoto in pausa - Buzz disabilitato');
+          console.log('Audio remoto in pausa - Buzz disabilitato per partecipante');
         };
         
         const handleRemoteEnded = () => {
           setIsRemotePlaying(false);
           setIsAudioPlaying(false);
-          console.log('Audio remoto terminato - Buzz disabilitato');
+          console.log('Audio remoto terminato - Buzz disabilitato per partecipante');
+        };
+
+        const handleCanPlay = () => {
+          console.log('Audio remoto pronto per la riproduzione');
         };
 
         remoteAudio.addEventListener('play', handleRemotePlay);
         remoteAudio.addEventListener('pause', handleRemotePause);
         remoteAudio.addEventListener('ended', handleRemoteEnded);
+        remoteAudio.addEventListener('canplay', handleCanPlay);
+        
+        // Controlla lo stato iniziale
+        if (!remoteAudio.paused && remoteAudio.currentTime > 0) {
+          setIsRemotePlaying(true);
+          setIsAudioPlaying(true);
+        }
         
         return () => {
           remoteAudio.removeEventListener('play', handleRemotePlay);
           remoteAudio.removeEventListener('pause', handleRemotePause);
           remoteAudio.removeEventListener('ended', handleRemoteEnded);
+          remoteAudio.removeEventListener('canplay', handleCanPlay);
         };
       }
+
+      // Fallback: controlla periodicamente se c'è audio in riproduzione
+      const checkAudioInterval = setInterval(() => {
+        if (remoteAudio && !remoteAudio.paused && remoteAudio.currentTime > 0) {
+          if (!isRemotePlaying) {
+            setIsRemotePlaying(true);
+            setIsAudioPlaying(true);
+            console.log('Audio remoto rilevato tramite fallback - Buzz abilitato');
+          }
+        } else if (isRemotePlaying) {
+          setIsRemotePlaying(false);
+          setIsAudioPlaying(false);
+          console.log('Audio remoto fermato tramite fallback - Buzz disabilitato');
+        }
+      }, 500); // Controlla ogni 500ms
+
+      return () => {
+        clearInterval(checkAudioInterval);
+      };
     }
-  }, [isHost, setIsAudioPlaying]);
+  }, [isHost, setIsAudioPlaying, isRemotePlaying]);
 
   // Aggiorna il tempo corrente e la durata quando l'audio cambia
   useEffect(() => {
