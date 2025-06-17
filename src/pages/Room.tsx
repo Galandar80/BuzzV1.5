@@ -7,12 +7,15 @@ import BuzzButton from '../components/BuzzButton';
 import PlayerList from '../components/PlayerList';
 import RoomInfo from '../components/RoomInfo';
 import AudioPlayer from '../components/AudioPlayer';
+import GameModeSelector from '../components/GameModeSelector';
+import GameTimer from '../components/GameTimer';
+import GameModeDisplay from '../components/GameModeDisplay';
 import { MessageCircle, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 const Room = () => {
   const { code } = useParams<{ code: string }>();
-  const { roomCode, setRoomCode, roomData, playerName, isHost, error, isLoading } = useRoom();
+  const { roomCode, setRoomCode, roomData, playerName, isHost, error, isLoading, winnerName } = useRoom();
   const navigate = useNavigate();
   const [isInitializing, setIsInitializing] = useState(true);
 
@@ -91,42 +94,64 @@ const Room = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-b from-indigo-50 via-purple-50 to-pink-50 dark:from-indigo-950/50 dark:via-purple-950/30 dark:to-pink-950/20">
+    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex flex-col">
       <Header />
       
-      <main className="flex-1 flex flex-col p-6">
-        {isHost ? (
-          // Layout per l'host
-          <div className="flex flex-col lg:flex-row gap-6">
-            {/* Colonna sinistra: Controlli della stanza e lista giocatori */}
-            <div className="lg:w-1/3 space-y-6 lg:sticky lg:top-6 self-start">
-              <RoomInfo />
-              <div className="bg-white/10 backdrop-blur-md rounded-xl shadow-lg border border-white/20 p-6">
-                <div className="flex flex-col items-center mb-6">
-                  <WinnerAnswer />
-                  <div className="w-full max-w-md">
-                    <BuzzButton />
-                  </div>
-                </div>
-                <h2 className="text-xl font-bold mb-4">Giocatori in stanza</h2>
-                <PlayerList />
-              </div>
+      <main className="flex-1 container mx-auto px-4 py-8">
+        {isLoading ? (
+          <div className="flex items-center justify-center min-h-[400px]">
+            <div className="text-center">
+              <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-white" />
+              <p className="text-white">Caricamento stanza...</p>
             </div>
-
-            {/* Colonna destra: Player audio e controlli del gioco */}
-            <div className="lg:w-2/3 space-y-6">
-              <AudioPlayer />
+          </div>
+        ) : error ? (
+          <div className="text-center py-12">
+            <div className="bg-red-500/20 border border-red-500/30 rounded-lg p-6 max-w-md mx-auto">
+              <h2 className="text-xl font-bold text-red-400 mb-2">Errore</h2>
+              <p className="text-red-300 mb-4">{error}</p>
+              <button
+                onClick={() => navigate('/')}
+                className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg transition-colors"
+              >
+                Torna alla Home
+              </button>
             </div>
           </div>
         ) : (
-          // Layout per i giocatori
-          <div className="w-full max-w-4xl mx-auto space-y-8">
+          <div className="space-y-6">
             <RoomInfo />
-            <div className="flex flex-col items-center">
-              <WinnerAnswer />
-              <BuzzButton />
+            
+            {/* Game Mode Display - Visibile a tutti quando una modalità è attiva */}
+            <GameModeDisplay />
+            
+            {/* Game Timer - Visibile a tutti quando attivo */}
+            <GameTimer />
+            
+            {/* Game Mode Selector - Solo per l'host */}
+            {isHost && (
+              <div className="mb-6">
+                <GameModeSelector />
+              </div>
+            )}
+            
+            {isHost && <AudioPlayer />}
+            
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="space-y-6">
+                <BuzzButton />
+                {winnerName && (
+                  <div className="bg-green-500/20 border border-green-500/30 rounded-lg p-4 text-center">
+                    <MessageCircle className="w-8 h-8 mx-auto mb-2 text-green-400" />
+                    <p className="text-green-300">
+                      <span className="font-bold">{winnerName}</span> può rispondere!
+                    </p>
+                  </div>
+                )}
+              </div>
+              
+              <PlayerList />
             </div>
-            <PlayerList />
           </div>
         )}
       </main>

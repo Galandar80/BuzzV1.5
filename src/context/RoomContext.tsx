@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import {
@@ -25,6 +25,7 @@ interface Player {
   isHost: boolean;
   joinedAt: number;
   points?: number;
+  team?: 'A' | 'B';
 }
 
 interface WinnerInfo {
@@ -32,6 +33,29 @@ interface WinnerInfo {
   playerName: string;
   timestamp: number;
   answer?: string;
+  timeLeft?: number;
+}
+
+interface GameMode {
+  type: 'classic' | 'speed' | 'marathon' | 'teams';
+  name: string;
+  description: string;
+  settings: GameModeSettings;
+}
+
+interface GameModeSettings {
+  timeLimit?: number;
+  autoNext?: boolean;
+  teamsEnabled?: boolean;
+  pointsCorrect?: number;
+  pointsWrong?: number;
+}
+
+interface GameTimer {
+  isActive: boolean;
+  timeLeft: number;
+  totalTime: number;
+  startTime?: number;
 }
 
 interface RoomData {
@@ -40,6 +64,9 @@ interface RoomData {
   winnerInfo: WinnerInfo | null;
   players: Record<string, Player>;
   playedSongs?: string[];
+  gameMode?: GameMode;
+  gameTimer?: GameTimer;
+  currentSong?: string;
 }
 
 interface RoomContextType {
@@ -53,7 +80,7 @@ interface RoomContextType {
   isHost: boolean;
   isLoading: boolean;
   error: string | null;
-  playersList: { id: string; name: string; isHost: boolean; points?: number }[];
+  playersList: { id: string; name: string; isHost: boolean; points?: number; team?: 'A' | 'B' }[];
   winnerName: string | null;
   handleCreateRoom: (name: string) => Promise<void>;
   handleJoinRoom: (roomCode: string, name: string) => Promise<void>;
@@ -66,6 +93,11 @@ interface RoomContextType {
   submitAnswer: (answer: string) => Promise<void>;
   audioStreamManager: AudioStreamManager | null;
   setAudioStreamManager: (manager: AudioStreamManager | null) => void;
+  setGameMode: (mode: GameMode) => Promise<void>;
+  startGameTimer: (seconds: number) => Promise<void>;
+  stopGameTimer: () => Promise<void>;
+  currentGameMode: GameMode | null;
+  gameTimer: GameTimer | null;
 }
 
 const RoomContext = createContext<RoomContextType | undefined>(undefined);
@@ -78,6 +110,8 @@ export function RoomProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [audioStreamManager, setAudioStreamManager] = useState<AudioStreamManager | null>(null);
+  const [currentGameMode, setCurrentGameMode] = useState<GameMode | null>(null);
+  const [gameTimer, setGameTimer] = useState<GameTimer | null>(null);
   
   const navigate = useNavigate();
 
@@ -89,10 +123,57 @@ export function RoomProvider({ children }: { children: ReactNode }) {
     id,
     name: player.name,
     isHost: player.isHost,
-    points: player.points || 0
+    points: player.points || 0,
+    team: player.team
   })) : [];
   
   const winnerName = roomData?.winnerInfo?.playerName || null;
+
+  // Timer interval ref
+  const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Modalità di gioco predefinite
+  const gameModes: GameMode[] = [
+    {
+      type: 'classic',
+      name: 'Classica',
+      description: 'Modalità tradizionale senza limiti di tempo',
+      settings: {
+        pointsCorrect: 10,
+        pointsWrong: 5
+      }
+    },
+    {
+      type: 'speed',
+      name: 'Velocità',
+      description: 'Rispondi entro il tempo limite!',
+      settings: {
+        timeLimit: 20,
+        pointsCorrect: 15,
+        pointsWrong: 5
+      }
+    },
+    {
+      type: 'marathon',
+      name: 'Maratona',
+      description: 'Playlist automatica senza pause',
+      settings: {
+        autoNext: true,
+        pointsCorrect: 8,
+        pointsWrong: 3
+      }
+    },
+    {
+      type: 'teams',
+      name: 'Squadre',
+      description: 'Gioca in team contro team!',
+      settings: {
+        teamsEnabled: true,
+        pointsCorrect: 12,
+        pointsWrong: 4
+      }
+    }
+  ];
 
   useEffect(() => {
     let unsubscribe: (() => void) | null = null;
@@ -322,6 +403,122 @@ export function RoomProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // Funzione per impostare la modalità di gioco
+  const setGameMode = async (mode: GameMode) => {
+    if (!roomCode || !isHost) return;
+    
+    try {
+      await update(ref(database, `rooms/${roomCode}`), {
+        gameMode: mode,
+        lastActivity: Date.now()
+      });
+      
+      setCurrentGameMode(mode);
+      toast.success(`Modalità "${mode.name}" attivata!`);
+    } catch (err) {
+      console.error('Errore nell\'impostare la modalità di gioco:', err);
+      toast.error('Errore nell\'impostare la modalità di gioco');
+    }
+  };
+
+  // Funzione per avviare il timer
+  const startGameTimer = async (seconds: number) => {
+    if (!roomCode || !isHost) return;
+    
+    try {
+      const timer: GameTimer = {
+        isActive: true,
+        timeLeft: seconds,
+        totalTime: seconds,
+        startTime: Date.now()
+      };
+      
+      await update(ref(database, `rooms/${roomCode}`), {
+        gameTimer: timer,
+        lastActivity: Date.now()
+      });
+      
+      setGameTimer(timer);
+      toast.success(`Timer avviato: ${seconds} secondi!`);
+    } catch (err) {
+      console.error('Errore nell\'avviare il timer:', err);
+      toast.error('Errore nell\'avviare il timer');
+    }
+  };
+
+  // Funzione per fermare il timer
+  const stopGameTimer = async () => {
+    if (!roomCode || !isHost) return;
+    
+    try {
+      await update(ref(database, `rooms/${roomCode}`), {
+        gameTimer: null,
+        lastActivity: Date.now()
+      });
+      
+      setGameTimer(null);
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current);
+        timerIntervalRef.current = null;
+      }
+      toast.info('Timer fermato');
+    } catch (err) {
+      console.error('Errore nel fermare il timer:', err);
+      toast.error('Errore nel fermare il timer');
+    }
+  };
+
+  // Effetto per gestire il timer lato client
+  useEffect(() => {
+    if (roomData?.gameTimer?.isActive) {
+      const timer = roomData.gameTimer;
+      
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current);
+      }
+      
+      timerIntervalRef.current = setInterval(() => {
+        const elapsed = Math.floor((Date.now() - (timer.startTime || Date.now())) / 1000);
+        const timeLeft = Math.max(0, timer.totalTime - elapsed);
+        
+        setGameTimer(prev => prev ? { ...prev, timeLeft } : null);
+        
+        if (timeLeft <= 0) {
+          if (timerIntervalRef.current) {
+            clearInterval(timerIntervalRef.current);
+            timerIntervalRef.current = null;
+          }
+          
+          if (isHost) {
+            stopGameTimer();
+            toast.warning('Tempo scaduto!');
+          }
+        }
+      }, 100);
+    } else {
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current);
+        timerIntervalRef.current = null;
+      }
+    }
+    
+    return () => {
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current);
+      }
+    };
+  }, [roomData?.gameTimer, isHost]);
+
+  // Aggiorna il gameMode e gameTimer quando cambiano i roomData
+  useEffect(() => {
+    if (roomData?.gameMode) {
+      setCurrentGameMode(roomData.gameMode);
+    }
+    if (roomData?.gameTimer) {
+      setGameTimer(roomData.gameTimer);
+    }
+  }, [roomData?.gameMode, roomData?.gameTimer]);
+
   const value = {
     roomCode,
     setRoomCode,
@@ -346,6 +543,11 @@ export function RoomProvider({ children }: { children: ReactNode }) {
     submitAnswer,
     audioStreamManager,
     setAudioStreamManager,
+    setGameMode,
+    startGameTimer,
+    stopGameTimer,
+    currentGameMode,
+    gameTimer,
   };
 
   return <RoomContext.Provider value={value}>{children}</RoomContext.Provider>;
