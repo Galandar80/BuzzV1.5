@@ -72,6 +72,7 @@ interface RoomData {
   gameMode?: GameMode;
   gameTimer?: GameTimer;
   currentSong?: string;
+  buzzEnabled?: boolean;
 }
 
 interface RoomContextType {
@@ -108,9 +109,9 @@ interface RoomContextType {
   gameTimer: GameTimer | null;
   updatePlayerScore: (playerId: string, isCorrect: boolean, responseTime?: number) => Promise<void>;
   calculateScore: (responseTime: number, isCorrect: boolean, streak?: number) => number;
-  isAudioPlaying: boolean;
-  setIsAudioPlaying: (playing: boolean) => void;
-  canBuzz: boolean;
+  enableBuzz: () => Promise<void>;
+  disableBuzz: () => Promise<void>;
+  isBuzzEnabled: boolean;
 }
 
 const RoomContext = createContext<RoomContextType | undefined>(undefined);
@@ -154,7 +155,6 @@ export function RoomProvider({ children }: { children: ReactNode }) {
   const [audioStreamManager, setAudioStreamManager] = useState<AudioStreamManager | null>(null);
   const [currentGameMode, setCurrentGameMode] = useState<GameMode | null>(null);
   const [gameTimer, setGameTimer] = useState<GameTimer | null>(null);
-  const [isAudioPlaying, setIsAudioPlaying] = useState<boolean>(false);
   
   const navigate = useNavigate();
 
@@ -171,9 +171,6 @@ export function RoomProvider({ children }: { children: ReactNode }) {
   })) : [];
   
   const winnerName = roomData?.winnerInfo?.playerName || null;
-
-  // Il buzz è disponibile solo quando l'audio è in riproduzione e non c'è già un vincitore
-  const canBuzz = isAudioPlaying && !roomData?.winnerInfo && !!roomCode && !!playerId;
 
   // Timer interval ref
   const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -351,11 +348,17 @@ export function RoomProvider({ children }: { children: ReactNode }) {
   };
 
   const handleBuzz = async () => {
-    if (!canBuzz || !playerName) return;
+    if (!roomCode || !playerId || !playerName) return;
+    
+    // Controllo se il buzz è abilitato (default true per compatibilità)
+    const buzzEnabled = roomData?.buzzEnabled !== false;
+    if (!buzzEnabled) {
+      toast.warning('Il buzz è attualmente disabilitato dall\'host');
+      return;
+    }
     
     try {
-      await registerBuzz(roomCode!, playerId!, playerName);
-      toast.success('Buzz registrato!');
+      await registerBuzz(roomCode, playerId, playerName);
     } catch (err) {
       console.error('Errore nel registrare il buzz:', err);
       toast.error('Errore nel registrare il buzz');
@@ -756,6 +759,36 @@ export function RoomProvider({ children }: { children: ReactNode }) {
     }
   }, [roomData?.gameMode, roomData?.gameTimer]);
 
+  const enableBuzz = async () => {
+    if (!roomCode || !isHost) return;
+    
+    try {
+      await update(ref(database, `rooms/${roomCode}`), {
+        buzzEnabled: true,
+        lastActivity: Date.now()
+      });
+      toast.success('Buzz attivato');
+    } catch (err) {
+      console.error('Errore nell\'attivare il buzz:', err);
+      toast.error('Errore nell\'attivare il buzz');
+    }
+  };
+
+  const disableBuzz = async () => {
+    if (!roomCode || !isHost) return;
+    
+    try {
+      await update(ref(database, `rooms/${roomCode}`), {
+        buzzEnabled: false,
+        lastActivity: Date.now()
+      });
+      toast.success('Buzz disattivato');
+    } catch (err) {
+      console.error('Errore nel disattivare il buzz:', err);
+      toast.error('Errore nel disattivare il buzz');
+    }
+  };
+
   const value = {
     roomCode,
     setRoomCode,
@@ -790,9 +823,9 @@ export function RoomProvider({ children }: { children: ReactNode }) {
     gameTimer,
     updatePlayerScore,
     calculateScore,
-    isAudioPlaying,
-    setIsAudioPlaying,
-    canBuzz,
+    enableBuzz,
+    disableBuzz,
+    isBuzzEnabled: !!roomData?.buzzEnabled,
   };
 
   return <RoomContext.Provider value={value}>{children}</RoomContext.Provider>;

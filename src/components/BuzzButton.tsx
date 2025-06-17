@@ -1,17 +1,28 @@
 import React, { useState, useEffect } from 'react';
 import { useRoom } from '../context/RoomContext';
 import { toast } from 'sonner';
-import { Award, CheckCircle, XCircle, Plus, Minus, Send, Volume2, VolumeX } from 'lucide-react';
+import { Award, CheckCircle, XCircle, Plus, Minus, Send } from 'lucide-react';
 import { Button } from './ui/button';
 import { Textarea } from './ui/textarea';
-import { Badge } from './ui/badge';
 
 interface BuzzButtonProps {
   disabled?: boolean;
 }
 
 const BuzzButton: React.FC<BuzzButtonProps> = ({ disabled = false }) => {
-  const { handleBuzz, winnerName, isHost, playerId, handleResetBuzz, awardPoints, subtractPlayerPoints, rejectAnswer, submitAnswer, roomData, canBuzz, isAudioPlaying } = useRoom();
+  const { 
+    handleBuzz, 
+    winnerName, 
+    isHost, 
+    playerId, 
+    handleResetBuzz, 
+    awardPoints, 
+    subtractPlayerPoints, 
+    rejectAnswer, 
+    submitAnswer, 
+    roomData,
+    isBuzzEnabled 
+  } = useRoom();
   const [isBuzzing, setIsBuzzing] = useState(false);
   const [answer, setAnswer] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -28,23 +39,8 @@ const BuzzButton: React.FC<BuzzButtonProps> = ({ disabled = false }) => {
   // Verifichiamo se il giocatore corrente è il vincitore
   const isCurrentPlayerWinner = winnerName && playerId && roomData?.winnerInfo?.playerId === playerId;
 
-  // Gestione tasti per il buzz
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.code === 'Space' && canBuzz && !isBuzzing) {
-        event.preventDefault();
-        onBuzz();
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [canBuzz, isBuzzing]);
-
   const onBuzz = async () => {
-    if (!canBuzz || isBuzzing) return;
+    if (disabled || isBuzzing || !isBuzzEnabled) return;
     
     setIsBuzzing(true);
     try {
@@ -179,60 +175,34 @@ const BuzzButton: React.FC<BuzzButtonProps> = ({ disabled = false }) => {
     );
   }
 
-  // Interfaccia originale per i partecipanti
   return (
-    <div className="flex flex-col items-center space-y-4">
-      {/* Indicatore discreto dello stato audio solo se non è in riproduzione */}
-      {!isAudioPlaying && (
-        <Badge 
-          variant="secondary"
-          className="flex items-center gap-1 bg-gray-500/20 text-gray-500 border-gray-300"
-        >
-          <VolumeX className="w-3 h-3" />
-          Audio in pausa
-        </Badge>
+    <div className="flex flex-col items-center gap-4">
+      {/* Messaggio di stato del buzz per i non-host */}
+      {!isHost && !isBuzzEnabled && (
+        <div className="bg-orange-500/20 border border-orange-500/30 rounded-lg p-3 text-center">
+          <p className="text-orange-300 text-sm font-medium">
+            🚫 Buzz disabilitato dall'host
+          </p>
+        </div>
       )}
-
-      {/* Pulsante Buzz originale */}
+      
       <button
         onClick={onBuzz}
-        disabled={!canBuzz || isBuzzing}
+        disabled={disabled || isBuzzing || !isBuzzEnabled}
         className={`
           w-64 h-64 sm:w-72 sm:h-72 md:w-80 md:h-80
           rounded-full
           buzz-button
-          ${isBuzzing ? 'scale-95' : canBuzz ? 'animate-pulse-buzz' : ''}
-          ${!canBuzz ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:scale-105'}
+          ${!isBuzzEnabled ? 'disabled' : ''}
+          ${isBuzzing ? 'scale-95' : 'animate-pulse-buzz'}
+          ${disabled || !isBuzzEnabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:scale-105'}
           transition-all duration-300
-          ${!canBuzz ? 'grayscale' : ''}
         `}
-        style={{
-          background: canBuzz 
-            ? 'radial-gradient(circle at center, #ff4444 0%, #cc0000 70%, #990000 100%)'
-            : 'radial-gradient(circle at center, #666666 0%, #444444 70%, #222222 100%)'
-        }}
       >
         <span className="text-white text-4xl sm:text-5xl font-bold z-10 tracking-wider shadow-text">
-          {canBuzz ? 'BUZZ!' : 'ASPETTA...'}
+          {!isBuzzEnabled ? 'BUZZ\nDISABILITATO' : 'BUZZ!'}
         </span>
       </button>
-
-      {/* Istruzioni */}
-      <div className="text-center space-y-1">
-        {canBuzz ? (
-          <p className="text-sm font-medium text-green-600">
-            🎵 Premi SPAZIO o clicca per buzzare!
-          </p>
-        ) : !isAudioPlaying ? (
-          <p className="text-sm text-gray-500">
-            ⏸️ Aspetta che inizi il brano
-          </p>
-        ) : (
-          <p className="text-sm text-gray-500">
-            Buzz non disponibile
-          </p>
-        )}
-      </div>
     </div>
   );
 };

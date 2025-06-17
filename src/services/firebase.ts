@@ -62,6 +62,7 @@ export const createRoom = async (roomCode: string, hostName: string, hostId: str
     createdAt: now,
     lastActivity: now,
     winnerInfo: null,
+    buzzEnabled: true,
     players: {
       [hostId]: { 
         name: hostName, 

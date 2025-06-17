@@ -12,6 +12,7 @@ import GameTimer from '../components/GameTimer';
 import GameModeDisplay from '../components/GameModeDisplay';
 import PlayerAnswer from '../components/PlayerAnswer';
 import AnswerNotification from '../components/AnswerNotification';
+import BuzzController from '../components/BuzzController';
 import { MessageCircle, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Leaderboard } from '../components/Leaderboard';
@@ -118,8 +119,9 @@ const Room = () => {
             
             {/* Game Mode Selector - Solo per l'host */}
             {isHost && (
-              <div className="mb-6">
+              <div className="mb-6 space-y-6">
                 <GameModeSelector />
+                <BuzzController />
               </div>
             )}
             
