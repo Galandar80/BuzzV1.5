@@ -10,6 +10,8 @@ import AudioPlayer from '../components/AudioPlayer';
 import GameModeSelector from '../components/GameModeSelector';
 import GameTimer from '../components/GameTimer';
 import GameModeDisplay from '../components/GameModeDisplay';
+import PlayerAnswer from '../components/PlayerAnswer';
+import AnswerNotification from '../components/AnswerNotification';
 import { MessageCircle, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Leaderboard } from '../components/Leaderboard';
@@ -73,31 +75,15 @@ const Room = () => {
     );
   }
 
-  const WinnerAnswer = () => {
-    if (!roomData?.winnerInfo?.answer) return null;
-
-    return (
-      <div className="w-full max-w-2xl mx-auto mb-8 p-6 rounded-xl bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-900/20 dark:to-purple-900/20 border border-indigo-100 dark:border-indigo-700/30 shadow-lg animate-fade-in">
-        <div className="flex items-start gap-4">
-          <div className="p-2 rounded-full bg-indigo-100 dark:bg-indigo-900/30">
-            <MessageCircle className="w-6 h-6 text-indigo-600 dark:text-indigo-300" />
-          </div>
-          <div className="flex-1">
-            <p className="text-sm text-indigo-600 dark:text-indigo-300 mb-1">
-              Risposta di {roomData.winnerInfo.playerName}:
-            </p>
-            <p className="text-lg font-medium text-gray-900 dark:text-gray-100">
-              "{roomData.winnerInfo.answer}"
-            </p>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex flex-col">
       <Header />
+      
+      {/* Componente per visualizzare le risposte in modo prominente */}
+      <PlayerAnswer />
+      
+      {/* Componente per le notifiche delle risposte */}
+      <AnswerNotification />
       
       <main className="flex-1 container mx-auto px-4 py-8">
         {isLoading ? (
@@ -142,7 +128,7 @@ const Room = () => {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <div className="space-y-6">
                 <BuzzButton />
-                {winnerName && (
+                {winnerName && !roomData?.winnerInfo?.answer && (
                   <div className="bg-green-500/20 border border-green-500/30 rounded-lg p-4 text-center">
                     <MessageCircle className="w-8 h-8 mx-auto mb-2 text-green-400" />
                     <p className="text-green-300">
