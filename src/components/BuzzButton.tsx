@@ -1,20 +1,23 @@
 import React, { useState, useEffect } from 'react';
 import { useRoom } from '../context/RoomContext';
 import { toast } from 'sonner';
-import { Award, CheckCircle, XCircle, Plus, Minus, Send } from 'lucide-react';
+import { Award, CheckCircle, XCircle, Plus, Minus, Send, Zap, ZapOff, Play, Pause, Volume2, VolumeX } from 'lucide-react';
 import { Button } from './ui/button';
 import { Textarea } from './ui/textarea';
+import { Badge } from './ui/badge';
 
 interface BuzzButtonProps {
   disabled?: boolean;
 }
 
 const BuzzButton: React.FC<BuzzButtonProps> = ({ disabled = false }) => {
-  const { handleBuzz, winnerName, isHost, playerId, handleResetBuzz, awardPoints, subtractPlayerPoints, rejectAnswer, submitAnswer, roomData } = useRoom();
+  const { handleBuzz, winnerName, isHost, playerId, handleResetBuzz, awardPoints, subtractPlayerPoints, rejectAnswer, submitAnswer, roomData, canBuzz, isAudioPlaying } = useRoom();
   const [isBuzzing, setIsBuzzing] = useState(false);
   const [answer, setAnswer] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasSubmitted, setHasSubmitted] = useState(false);
+  const [isPressed, setIsPressed] = useState(false);
+  const [keyPressed, setKeyPressed] = useState(false);
 
   // Reset hasSubmitted state when buzz is reset
   useEffect(() => {
@@ -26,6 +29,32 @@ const BuzzButton: React.FC<BuzzButtonProps> = ({ disabled = false }) => {
 
   // Verifichiamo se il giocatore corrente è il vincitore
   const isCurrentPlayerWinner = winnerName && playerId && roomData?.winnerInfo?.playerId === playerId;
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.code === 'Space' && canBuzz && !keyPressed) {
+        event.preventDefault();
+        setKeyPressed(true);
+        setIsPressed(true);
+        handleBuzz();
+      }
+    };
+
+    const handleKeyUp = (event: KeyboardEvent) => {
+      if (event.code === 'Space') {
+        setKeyPressed(false);
+        setIsPressed(false);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
+  }, [handleBuzz, canBuzz, keyPressed]);
 
   const onBuzz = async () => {
     if (disabled || isBuzzing) return;
@@ -82,6 +111,51 @@ const BuzzButton: React.FC<BuzzButtonProps> = ({ disabled = false }) => {
       setIsSubmitting(false);
     }
   };
+
+  // Determina lo stato del pulsante
+  const getButtonState = () => {
+    if (winnerName) {
+      return {
+        text: `${winnerName} può rispondere`,
+        variant: 'secondary' as const,
+        disabled: true,
+        icon: <Zap className="w-6 h-6" />,
+        className: 'bg-yellow-500/20 text-yellow-600 border-yellow-500/30'
+      };
+    }
+    
+    if (!isAudioPlaying) {
+      return {
+        text: 'In attesa del brano...',
+        variant: 'outline' as const,
+        disabled: true,
+        icon: <VolumeX className="w-6 h-6 opacity-50" />,
+        className: 'bg-gray-500/10 text-gray-500 border-gray-300 cursor-not-allowed'
+      };
+    }
+    
+    if (canBuzz) {
+      return {
+        text: 'BUZZ!',
+        variant: 'default' as const,
+        disabled: false,
+        icon: <Zap className="w-6 h-6" />,
+        className: `bg-gradient-to-r from-red-500 to-orange-500 hover:from-red-600 hover:to-orange-600 text-white border-0 shadow-lg hover:shadow-xl transform transition-all duration-200 ${
+          isPressed ? 'scale-95 shadow-md' : 'hover:scale-105'
+        } animate-pulse`
+      };
+    }
+    
+    return {
+      text: 'BUZZ non disponibile',
+      variant: 'outline' as const,
+      disabled: true,
+      icon: <ZapOff className="w-6 h-6 opacity-50" />,
+      className: 'bg-gray-500/10 text-gray-500 border-gray-300'
+    };
+  };
+
+  const buttonState = getButtonState();
 
   if (winnerName) {
     return (
@@ -164,22 +238,90 @@ const BuzzButton: React.FC<BuzzButtonProps> = ({ disabled = false }) => {
   }
 
   return (
-    <button
-      onClick={onBuzz}
-      disabled={disabled || isBuzzing}
-      className={`
-        w-64 h-64 sm:w-72 sm:h-72 md:w-80 md:h-80
-        rounded-full
-        buzz-button
-        ${isBuzzing ? 'scale-95' : 'animate-pulse-buzz'}
-        ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:scale-105'}
-        transition-all duration-300
-      `}
-    >
-      <span className="text-white text-4xl sm:text-5xl font-bold z-10 tracking-wider shadow-text">
-        BUZZ!
-      </span>
-    </button>
+    <div className="flex flex-col items-center space-y-4">
+      {/* Indicatore stato audio */}
+      <div className="flex items-center gap-2">
+        <Badge 
+          variant={isAudioPlaying ? "default" : "secondary"}
+          className={`flex items-center gap-1 ${
+            isAudioPlaying 
+              ? 'bg-green-500/20 text-green-600 border-green-500/30 animate-pulse' 
+              : 'bg-gray-500/20 text-gray-500 border-gray-300'
+          }`}
+        >
+          {isAudioPlaying ? (
+            <>
+              <Volume2 className="w-3 h-3" />
+              Audio in riproduzione
+            </>
+          ) : (
+            <>
+              <VolumeX className="w-3 h-3" />
+              Audio in pausa
+            </>
+          )}
+        </Badge>
+      </div>
+
+      {/* Pulsante Buzz principale */}
+      <Button
+        onClick={onBuzz}
+        disabled={buttonState.disabled}
+        variant={buttonState.variant}
+        size="lg"
+        className={`w-32 h-32 rounded-full text-2xl font-bold ${buttonState.className} relative overflow-hidden`}
+      >
+        <div className="flex flex-col items-center gap-2">
+          {buttonState.icon}
+          <span className="text-sm font-semibold">
+            {buttonState.text}
+          </span>
+        </div>
+        
+        {/* Effetto di ripple quando disponibile */}
+        {canBuzz && (
+          <div className="absolute inset-0 rounded-full border-4 border-white/30 animate-ping" />
+        )}
+      </Button>
+
+      {/* Istruzioni */}
+      <div className="text-center space-y-1">
+        {canBuzz ? (
+          <>
+            <p className="text-sm font-medium text-green-600">
+              🎵 Premi SPAZIO o clicca per buzzare!
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Il buzz è attivo durante la riproduzione
+            </p>
+          </>
+        ) : !isAudioPlaying ? (
+          <>
+            <p className="text-sm text-gray-500">
+              ⏸️ Aspetta che inizi il brano
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Il buzz si attiverà automaticamente
+            </p>
+          </>
+        ) : winnerName ? (
+          <p className="text-sm text-yellow-600">
+            🏆 Qualcuno ha già buzzato!
+          </p>
+        ) : (
+          <p className="text-sm text-gray-500">
+            Buzz non disponibile
+          </p>
+        )}
+      </div>
+
+      {/* Indicatore per l'host */}
+      {isHost && (
+        <Badge variant="outline" className="text-xs">
+          👑 Host - Controlla l'audio per abilitare il buzz
+        </Badge>
+      )}
+    </div>
   );
 };
 

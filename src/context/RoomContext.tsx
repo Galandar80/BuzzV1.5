@@ -108,6 +108,9 @@ interface RoomContextType {
   gameTimer: GameTimer | null;
   updatePlayerScore: (playerId: string, isCorrect: boolean, responseTime?: number) => Promise<void>;
   calculateScore: (responseTime: number, isCorrect: boolean, streak?: number) => number;
+  isAudioPlaying: boolean;
+  setIsAudioPlaying: (playing: boolean) => void;
+  canBuzz: boolean;
 }
 
 const RoomContext = createContext<RoomContextType | undefined>(undefined);
@@ -151,6 +154,7 @@ export function RoomProvider({ children }: { children: ReactNode }) {
   const [audioStreamManager, setAudioStreamManager] = useState<AudioStreamManager | null>(null);
   const [currentGameMode, setCurrentGameMode] = useState<GameMode | null>(null);
   const [gameTimer, setGameTimer] = useState<GameTimer | null>(null);
+  const [isAudioPlaying, setIsAudioPlaying] = useState<boolean>(false);
   
   const navigate = useNavigate();
 
@@ -167,6 +171,9 @@ export function RoomProvider({ children }: { children: ReactNode }) {
   })) : [];
   
   const winnerName = roomData?.winnerInfo?.playerName || null;
+
+  // Il buzz è disponibile solo quando l'audio è in riproduzione e non c'è già un vincitore
+  const canBuzz = isAudioPlaying && !roomData?.winnerInfo && !!roomCode && !!playerId;
 
   // Timer interval ref
   const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -344,10 +351,11 @@ export function RoomProvider({ children }: { children: ReactNode }) {
   };
 
   const handleBuzz = async () => {
-    if (!roomCode || !playerId || !playerName) return;
+    if (!canBuzz || !playerName) return;
     
     try {
-      await registerBuzz(roomCode, playerId, playerName);
+      await registerBuzz(roomCode!, playerId!, playerName);
+      toast.success('Buzz registrato!');
     } catch (err) {
       console.error('Errore nel registrare il buzz:', err);
       toast.error('Errore nel registrare il buzz');
@@ -782,6 +790,9 @@ export function RoomProvider({ children }: { children: ReactNode }) {
     gameTimer,
     updatePlayerScore,
     calculateScore,
+    isAudioPlaying,
+    setIsAudioPlaying,
+    canBuzz,
   };
 
   return <RoomContext.Provider value={value}>{children}</RoomContext.Provider>;

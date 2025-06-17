@@ -10,7 +10,7 @@ interface AudioPlayerProps {
 }
 
 const AudioPlayer: React.FC<AudioPlayerProps> = ({ onAudioPause }) => {
-  const { isHost, roomData, roomCode } = useRoom();
+  const { isHost, roomData, roomCode, setIsAudioPlaying } = useRoom();
   const [leftFiles, setLeftFiles] = useState<File[]>([]);
   const [rightFiles, setRightFiles] = useState<File[]>([]);
   const [masterVolume, setMasterVolume] = useState(1);
@@ -41,6 +41,39 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ onAudioPause }) => {
     }
   }, [roomCode, isHost]);
 
+  // Monitora lo stato di riproduzione e comunica al contesto
+  useEffect(() => {
+    if (currentAudio) {
+      const handlePlay = () => {
+        setIsAudioPlaying(true);
+        console.log('Audio iniziato - Buzz abilitato');
+      };
+      
+      const handlePause = () => {
+        setIsAudioPlaying(false);
+        console.log('Audio in pausa - Buzz disabilitato');
+      };
+      
+      const handleEnded = () => {
+        setIsAudioPlaying(false);
+        console.log('Audio terminato - Buzz disabilitato');
+      };
+
+      currentAudio.addEventListener('play', handlePlay);
+      currentAudio.addEventListener('pause', handlePause);
+      currentAudio.addEventListener('ended', handleEnded);
+
+      return () => {
+        currentAudio.removeEventListener('play', handlePlay);
+        currentAudio.removeEventListener('pause', handlePause);
+        currentAudio.removeEventListener('ended', handleEnded);
+      };
+    } else {
+      // Nessun audio attivo
+      setIsAudioPlaying(false);
+    }
+  }, [currentAudio, setIsAudioPlaying]);
+
   // Funzione per fermare la riproduzione audio
   const stopAudioPlayback = useCallback(() => {
     if (currentAudio) {
@@ -59,8 +92,9 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ onAudioPause }) => {
     }
     setCurrentAudio(null);
     setNowPlaying({ left: '', right: '' });
+    setIsAudioPlaying(false); // Comunica al contesto che l'audio è fermo
     if (onAudioPause) onAudioPause();
-  }, [currentAudio, masterVolume, onAudioPause]);
+  }, [currentAudio, masterVolume, onAudioPause, setIsAudioPlaying]);
 
   // Esponi la funzione di pausa globalmente
   useEffect(() => {
@@ -85,17 +119,36 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ onAudioPause }) => {
     if (!isHost) {
       const remoteAudio = document.getElementById('remote-audio') as HTMLAudioElement | null;
       if (remoteAudio) {
-        const handlePlay = () => setIsRemotePlaying(true);
-        const handlePause = () => setIsRemotePlaying(false);
-        remoteAudio.addEventListener('play', handlePlay);
-        remoteAudio.addEventListener('pause', handlePause);
+        const handleRemotePlay = () => {
+          setIsRemotePlaying(true);
+          setIsAudioPlaying(true);
+          console.log('Audio remoto iniziato - Buzz abilitato');
+        };
+        
+        const handleRemotePause = () => {
+          setIsRemotePlaying(false);
+          setIsAudioPlaying(false);
+          console.log('Audio remoto in pausa - Buzz disabilitato');
+        };
+        
+        const handleRemoteEnded = () => {
+          setIsRemotePlaying(false);
+          setIsAudioPlaying(false);
+          console.log('Audio remoto terminato - Buzz disabilitato');
+        };
+
+        remoteAudio.addEventListener('play', handleRemotePlay);
+        remoteAudio.addEventListener('pause', handleRemotePause);
+        remoteAudio.addEventListener('ended', handleRemoteEnded);
+        
         return () => {
-          remoteAudio.removeEventListener('play', handlePlay);
-          remoteAudio.removeEventListener('pause', handlePause);
+          remoteAudio.removeEventListener('play', handleRemotePlay);
+          remoteAudio.removeEventListener('pause', handleRemotePause);
+          remoteAudio.removeEventListener('ended', handleRemoteEnded);
         };
       }
     }
-  }, [isHost]);
+  }, [isHost, setIsAudioPlaying]);
 
   // Aggiorna il tempo corrente e la durata quando l'audio cambia
   useEffect(() => {
@@ -225,8 +278,10 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ onAudioPause }) => {
     if (currentAudio) {
       if (currentAudio.paused) {
         currentAudio.play();
+        // setIsAudioPlaying(true) sarà chiamato dall'event listener 'play'
       } else {
         currentAudio.pause();
+        // setIsAudioPlaying(false) sarà chiamato dall'event listener 'pause'
       }
     }
   };
