@@ -16,7 +16,7 @@ import {
   database,
   ref,
   update,
-  updateRoomActivity
+  updateRoomActivity,
 } from '../services/firebase';
 import { AudioStreamManager } from '../services/webrtc';
 
@@ -26,6 +26,12 @@ interface Player {
   joinedAt: number;
   points?: number;
   team?: 'A' | 'B';
+  currentStreak?: number;
+  bestStreak?: number;
+  correctAnswers?: number;
+  wrongAnswers?: number;
+  lastAnswerTime?: number;
+  averageResponseTime?: number;
 }
 
 interface WinnerInfo {
@@ -51,11 +57,10 @@ interface GameModeSettings {
   pointsWrong?: number;
 }
 
-interface GameTimer {
+export interface GameTimer {
   isActive: boolean;
   timeLeft: number;
   totalTime: number;
-  startTime?: number;
 }
 
 interface RoomData {
@@ -98,9 +103,40 @@ interface RoomContextType {
   stopGameTimer: () => Promise<void>;
   currentGameMode: GameMode | null;
   gameTimer: GameTimer | null;
+  updatePlayerScore: (playerId: string, isCorrect: boolean, responseTime?: number) => Promise<void>;
+  calculateScore: (responseTime: number, isCorrect: boolean, streak?: number) => number;
 }
 
 const RoomContext = createContext<RoomContextType | undefined>(undefined);
+
+// Aggiungo interfacce per il sistema di punteggio
+export interface PlayerScore {
+  playerId: string;
+  playerName: string;
+  totalScore: number;
+  correctAnswers: number;
+  wrongAnswers: number;
+  currentStreak: number;
+  bestStreak: number;
+  averageResponseTime: number;
+  lastAnswerTime?: number;
+}
+
+export interface ScoreSettings {
+  basePoints: number;
+  speedBonus: number;
+  streakMultiplier: number;
+  maxSpeedBonus: number;
+  penaltyPoints: number;
+}
+
+export interface ScoreHistory {
+  playerId: string;
+  points: number;
+  reason: string;
+  timestamp: number;
+  responseTime?: number;
+}
 
 export function RoomProvider({ children }: { children: ReactNode }) {
   const [roomCode, setRoomCode] = useState<string | null>(null);
@@ -332,8 +368,17 @@ export function RoomProvider({ children }: { children: ReactNode }) {
     if (!roomCode || !isHost || !roomData?.winnerInfo) return;
     
     try {
-      await assignPoints(roomCode, roomData.winnerInfo.playerId, amount);
-      toast.success(`Assegnati ${amount} punti a ${roomData.winnerInfo.playerName}!`);
+      const winnerInfo = roomData.winnerInfo;
+      const responseTime = winnerInfo.timeLeft 
+        ? (gameTimer?.totalTime || 30) - winnerInfo.timeLeft 
+        : 3; // Default 3 secondi se non c'è timer
+      
+      // Usa il nuovo sistema di punteggio avanzato
+      await updatePlayerScore(winnerInfo.playerId, true, responseTime);
+      
+      // Mantieni anche il sistema legacy per compatibilità
+      await assignPoints(roomCode, winnerInfo.playerId, amount);
+      
     } catch (err) {
       console.error('Errore nell\'assegnare punti:', err);
       toast.error('Errore nell\'assegnare punti');
@@ -344,8 +389,17 @@ export function RoomProvider({ children }: { children: ReactNode }) {
     if (!roomCode || !isHost || !roomData?.winnerInfo) return;
     
     try {
-      await subtractPoints(roomCode, roomData.winnerInfo.playerId, amount);
-      toast.error(`Sottratti ${amount} punti a ${roomData.winnerInfo.playerName}!`);
+      const winnerInfo = roomData.winnerInfo;
+      const responseTime = winnerInfo.timeLeft 
+        ? (gameTimer?.totalTime || 30) - winnerInfo.timeLeft 
+        : 3; // Default 3 secondi se non c'è timer
+      
+      // Usa il nuovo sistema di punteggio per risposta sbagliata
+      await updatePlayerScore(winnerInfo.playerId, false, responseTime);
+      
+      // Mantieni anche il sistema legacy per compatibilità
+      await subtractPoints(roomCode, winnerInfo.playerId, amount);
+      
     } catch (err) {
       console.error('Errore nel sottrarre punti:', err);
       toast.error('Errore nel sottrarre punti');
@@ -430,7 +484,6 @@ export function RoomProvider({ children }: { children: ReactNode }) {
         isActive: true,
         timeLeft: seconds,
         totalTime: seconds,
-        startTime: Date.now()
       };
       
       await update(ref(database, `rooms/${roomCode}`), {
@@ -468,6 +521,76 @@ export function RoomProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // Impostazioni di default per il punteggio
+  const defaultScoreSettings: ScoreSettings = {
+    basePoints: 100,
+    speedBonus: 50,
+    streakMultiplier: 1.5,
+    maxSpeedBonus: 200,
+    penaltyPoints: 25
+  };
+
+  // Funzione per calcolare il punteggio basato sulla velocità
+  const calculateScore = (responseTime: number, isCorrect: boolean, streak: number = 0): number => {
+    if (!isCorrect) return -defaultScoreSettings.penaltyPoints;
+    
+    let score = defaultScoreSettings.basePoints;
+    
+    // Bonus velocità (meno tempo = più punti)
+    const speedBonus = Math.max(0, defaultScoreSettings.maxSpeedBonus - (responseTime * 10));
+    score += Math.min(speedBonus, defaultScoreSettings.speedBonus);
+    
+    // Moltiplicatore streak
+    if (streak > 0) {
+      score *= Math.pow(defaultScoreSettings.streakMultiplier, Math.min(streak, 5));
+    }
+    
+    return Math.round(score);
+  };
+
+  // Funzione per aggiornare il punteggio di un giocatore
+  const updatePlayerScore = async (playerId: string, isCorrect: boolean, responseTime: number = 0) => {
+    if (!roomCode || !roomData) return;
+    
+    try {
+      const playerRef = ref(database, `rooms/${roomCode}/players/${playerId}`);
+      const currentPlayer = roomData.players[playerId];
+      
+      if (!currentPlayer) return;
+      
+      const currentScore = currentPlayer.points || 0;
+      const currentStreak = isCorrect ? (currentPlayer.currentStreak || 0) + 1 : 0;
+      const bestStreak = Math.max(currentStreak, currentPlayer.bestStreak || 0);
+      
+      const scoreChange = calculateScore(responseTime, isCorrect, currentStreak);
+      const newScore = Math.max(0, currentScore + scoreChange);
+      
+      await update(playerRef, {
+        points: newScore,
+        currentStreak,
+        bestStreak,
+        correctAnswers: (currentPlayer.correctAnswers || 0) + (isCorrect ? 1 : 0),
+        wrongAnswers: (currentPlayer.wrongAnswers || 0) + (isCorrect ? 0 : 1),
+        lastAnswerTime: Date.now()
+      });
+      
+      // Salva nella cronologia locale senza Firebase push
+      const historyEntry: ScoreHistory = {
+        playerId,
+        points: scoreChange,
+        reason: isCorrect ? 'Risposta corretta' : 'Risposta sbagliata',
+        timestamp: Date.now(),
+        responseTime
+      };
+      
+      toast.success(`${currentPlayer.name}: ${scoreChange > 0 ? '+' : ''}${scoreChange} punti!`);
+      
+    } catch (err) {
+      console.error('Errore nell\'aggiornare il punteggio:', err);
+      toast.error('Errore nell\'aggiornare il punteggio');
+    }
+  };
+
   // Effetto per gestire il timer lato client
   useEffect(() => {
     if (roomData?.gameTimer?.isActive) {
@@ -478,22 +601,24 @@ export function RoomProvider({ children }: { children: ReactNode }) {
       }
       
       timerIntervalRef.current = setInterval(() => {
-        const elapsed = Math.floor((Date.now() - (timer.startTime || Date.now())) / 1000);
-        const timeLeft = Math.max(0, timer.totalTime - elapsed);
-        
-        setGameTimer(prev => prev ? { ...prev, timeLeft } : null);
-        
-        if (timeLeft <= 0) {
-          if (timerIntervalRef.current) {
-            clearInterval(timerIntervalRef.current);
-            timerIntervalRef.current = null;
+        setGameTimer(prev => {
+          if (!prev) return null;
+          const newTimeLeft = Math.max(0, prev.timeLeft - 0.1);
+          
+          if (newTimeLeft <= 0) {
+            if (timerIntervalRef.current) {
+              clearInterval(timerIntervalRef.current);
+              timerIntervalRef.current = null;
+            }
+            
+            if (isHost) {
+              stopGameTimer();
+              toast.warning('Tempo scaduto!');
+            }
           }
           
-          if (isHost) {
-            stopGameTimer();
-            toast.warning('Tempo scaduto!');
-          }
-        }
+          return { ...prev, timeLeft: newTimeLeft };
+        });
       }, 100);
     } else {
       if (timerIntervalRef.current) {
@@ -548,6 +673,8 @@ export function RoomProvider({ children }: { children: ReactNode }) {
     stopGameTimer,
     currentGameMode,
     gameTimer,
+    updatePlayerScore,
+    calculateScore,
   };
 
   return <RoomContext.Provider value={value}>{children}</RoomContext.Provider>;

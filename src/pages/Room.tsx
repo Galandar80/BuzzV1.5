@@ -12,6 +12,8 @@ import GameTimer from '../components/GameTimer';
 import GameModeDisplay from '../components/GameModeDisplay';
 import { MessageCircle, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { Leaderboard } from '../components/Leaderboard';
+import { PlayerStats } from '../components/PlayerStats';
 
 const Room = () => {
   const { code } = useParams<{ code: string }>();
@@ -137,7 +139,7 @@ const Room = () => {
             
             {isHost && <AudioPlayer />}
             
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <div className="space-y-6">
                 <BuzzButton />
                 {winnerName && (
@@ -148,9 +150,17 @@ const Room = () => {
                     </p>
                   </div>
                 )}
+                
+                {/* Statistiche personali del giocatore */}
+                <PlayerStats compact={true} />
               </div>
               
               <PlayerList />
+              
+              {/* Classifica dei punteggi */}
+              <div className="space-y-6">
+                <Leaderboard />
+              </div>
             </div>
           </div>
         )}
