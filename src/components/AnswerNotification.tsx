@@ -40,7 +40,7 @@ export function AnswerNotification() {
         // Ignora errori audio
       }
     }
-  }, [roomData?.winnerInfo?.answer, roomData?.winnerInfo?.timestamp, lastAnswerTimestamp]);
+  }, [roomData?.winnerInfo, lastAnswerTimestamp]);
 
   // Questo componente non renderizza nulla visivamente
   return null;

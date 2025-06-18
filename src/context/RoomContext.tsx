@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import {
@@ -615,7 +615,7 @@ export function RoomProvider({ children }: { children: ReactNode }) {
   };
 
   // Funzione per fermare il timer
-  const stopGameTimer = async () => {
+  const stopGameTimer = useCallback(async () => {
     if (!roomCode || !isHost) return;
     
     try {
@@ -634,7 +634,7 @@ export function RoomProvider({ children }: { children: ReactNode }) {
       console.error('Errore nel fermare il timer:', err);
       toast.error('Errore nel fermare il timer');
     }
-  };
+  }, [roomCode, isHost]);
 
   // Impostazioni di default per il punteggio
   const defaultScoreSettings: ScoreSettings = {
@@ -747,7 +747,7 @@ export function RoomProvider({ children }: { children: ReactNode }) {
         clearInterval(timerIntervalRef.current);
       }
     };
-  }, [roomData?.gameTimer, isHost]);
+  }, [roomData?.gameTimer, isHost, stopGameTimer]);
 
   // Aggiorna il gameMode e gameTimer quando cambiano i roomData
   useEffect(() => {
