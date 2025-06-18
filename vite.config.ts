@@ -14,4 +14,17 @@ export default defineConfig(({ mode }) => ({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ['react', 'react-dom'],
+          firebase: ['firebase/app', 'firebase/database'],
+          ui: ['@radix-ui/react-slot', '@radix-ui/react-toast', 'lucide-react'],
+          router: ['react-router-dom']
+        }
+      }
+    },
+    chunkSizeWarningLimit: 1000
+  }
 }));
