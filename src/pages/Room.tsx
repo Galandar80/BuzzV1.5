@@ -17,6 +17,8 @@ import { MessageCircle, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Leaderboard } from '../components/Leaderboard';
 import { PlayerStats } from '../components/PlayerStats';
+import HotkeysManager from '../components/HotkeysManager';
+import HotkeysGuide from '../components/HotkeysGuide';
 
 const Room = () => {
   const { code } = useParams<{ code: string }>();
@@ -155,6 +157,14 @@ const Room = () => {
       </main>
       
       <Footer />
+      
+      {/* Gestione comandi rapidi da tastiera - Solo per l'host */}
+      {isHost && (
+        <>
+          <HotkeysManager />
+          <HotkeysGuide />
+        </>
+      )}
     </div>
   );
 };
