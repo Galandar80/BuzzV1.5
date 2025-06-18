@@ -165,3 +165,4 @@ Perfetto per:
 **Sviluppato con ❤️ per il divertimento di tutti!**
 
 Per supporto o domande, apri una [Issue](https://github.com/Galandar80/BuzzV1.3/issues) su GitHub.
+"# BuzzV1.5" 
