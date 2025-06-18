@@ -1,9 +1,8 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { useRoom } from '../context/RoomContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Users, Play } from 'lucide-react';
 
 const JoinRoomForm: React.FC = () => {
   const [name, setName] = useState('');
@@ -50,17 +49,23 @@ const JoinRoomForm: React.FC = () => {
   };
   
   return (
-    <div className="w-full max-w-md animate-fade-in">
+    <div className="w-full animate-fade-in">
       <div className="text-center mb-6">
-        <h2 className="text-2xl font-bold mb-2">Entra in una Stanza</h2>
-        <p className="text-muted-foreground">
-          Inserisci il codice di 4 cifre per entrare
+        <div className="w-16 h-16 bg-gradient-to-br from-blue-400 to-purple-500 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg shadow-blue-500/30">
+          <Users className="w-8 h-8 text-white" />
+        </div>
+        <h2 className="text-2xl font-bold mb-2 text-white flex items-center justify-center gap-2">
+          Unisciti al Gioco
+          <Play className="w-5 h-5 text-green-300" />
+        </h2>
+        <p className="text-purple-100">
+          Inserisci il codice di 4 cifre per entrare nella stanza
         </p>
       </div>
       
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className="space-y-2">
-          <label htmlFor="player-name" className="text-sm font-medium">
+          <label htmlFor="player-name" className="text-sm font-medium text-purple-100">
             Il tuo nome
           </label>
           <Input
@@ -70,14 +75,17 @@ const JoinRoomForm: React.FC = () => {
             value={name}
             onChange={(e) => setName(e.target.value)}
             disabled={isLoading}
-            className="bg-white/10 border-white/20 placeholder:text-muted-foreground/60"
+            className="bg-white/15 border-white/30 placeholder:text-purple-200/60 text-white focus:border-blue-300 focus:ring-blue-300/50 backdrop-blur-md"
             minLength={2}
             required
           />
+          <p className="text-xs text-purple-200/70">
+            🎵 Entra come giocatore e sfida i tuoi amici!
+          </p>
         </div>
         
         <div className="space-y-2">
-          <label className="text-sm font-medium">
+          <label className="text-sm font-medium text-purple-100">
             Codice stanza
           </label>
           <div className="flex justify-center gap-3">
@@ -95,30 +103,44 @@ const JoinRoomForm: React.FC = () => {
                 onChange={(e) => handleCodeChange(index, e.target.value)}
                 onKeyDown={(e) => handleKeyDown(index, e)}
                 disabled={isLoading}
-                className="code-digit"
+                className="w-14 h-16 text-2xl font-bold text-center bg-white/20 backdrop-blur-md border-2 border-white/40 rounded-xl shadow-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-400/50 focus:bg-white/30 focus:border-blue-400/50 text-white placeholder:text-purple-200/60"
                 required
               />
             ))}
           </div>
+          <p className="text-xs text-center text-purple-200/70 mt-2">
+            💡 Chiedi all'host il codice di 4 cifre
+          </p>
           {error && (
-            <p className="text-sm text-destructive mt-2">{error}</p>
+            <div className="bg-red-500/20 border border-red-500/30 rounded-lg p-3 mt-3">
+              <p className="text-sm text-red-200 text-center">{error}</p>
+            </div>
           )}
         </div>
         
         <Button
           type="submit"
           disabled={isLoading || name.trim().length < 2 || code.some(digit => digit === '')}
-          className="w-full"
+          className="w-full bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white font-semibold py-3 rounded-xl shadow-lg shadow-blue-500/30 hover:scale-105 transition-all duration-300 disabled:opacity-50 disabled:hover:scale-100"
         >
           {isLoading ? (
             <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Entrando...
+              <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+              Entrando nella stanza...
             </>
           ) : (
-            'Entra nella Stanza'
+            <>
+              <Users className="mr-2 h-5 w-5" />
+              Entra nella Stanza
+            </>
           )}
         </Button>
+        
+        <div className="text-center">
+          <p className="text-xs text-purple-200/80">
+            🎯 Una volta dentro, ascolta la musica e premi BUZZ per rispondere!
+          </p>
+        </div>
       </form>
     </div>
   );
